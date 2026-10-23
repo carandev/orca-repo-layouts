@@ -1,0 +1,9 @@
+{
+  "name": "orca-repo-layouts",
+  "version": "0.1.0",
+  "description": "Orca plugin that applies a per-project terminal pane/tab layout to every new worktree.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test" }
+}

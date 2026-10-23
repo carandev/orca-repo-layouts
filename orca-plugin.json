@@ -1,0 +1,45 @@
+{
+  "manifestVersion": 1,
+  "id": "repo-layouts",
+  "publisher": "carandev",
+  "name": "Repo Layouts",
+  "version": "0.3.0",
+  "description": "Applies a per-project terminal pane/tab layout to every new worktree (or on demand to an existing one), driven by a user config file.",
+  "engines": {
+    "orca": ">=1.4.0"
+  },
+  "pluginApi": 1,
+  "main": "main.mjs",
+  "contributes": {
+    "events": [
+      {
+        "on": "worktree.created"
+      }
+    ],
+    "commands": [
+      {
+        "id": "apply-layout",
+        "title": "Repo Layouts: Apply layout",
+        "context": "worktree"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apply-layout",
+        "key": "Mod+Alt+L",
+        "when": "worktree"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "events:subscribe"
+    },
+    {
+      "kind": "notifications:show"
+    },
+    {
+      "kind": "workspace:read"
+    }
+  ]
+}
