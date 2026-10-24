@@ -1,0 +1,19 @@
+{
+  "name": "carandev plugins",
+  "owner": "carandev",
+  "plugins": [
+    {
+      "id": "carandev.repo-layouts",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/carandev/orca-repo-layouts.git",
+        "ref": "v0.4.0"
+      },
+      "description": "Applies a per-project terminal pane/tab layout to every new worktree, with a built-in config editor.",
+      "categories": [
+        "layouts",
+        "terminals"
+      ]
+    }
+  ]
+}

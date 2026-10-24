@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { applyForWorktree } from '../src/apply.mjs';
+import { applyForWorktree, applyLayout, resolveActiveWorktree } from '../src/apply.mjs';
 
 const FILE = '/cfg/config.json';
 
@@ -36,6 +36,19 @@ test('no config file: logs and does nothing', async () => {
   assert.equal((await applyForWorktree(s.deps)).applied, false);
   assert.equal(s.calls.length, 0);
   assert.match(s.logs.join('\n'), /no config/i);
+  assert.match(s.logs.join('\n'), /Repo Layouts: Edit config/);
+});
+
+test('no config file: the manual trigger returns a notice pointing at Edit config', async () => {
+  const s = setup(undefined);
+  const r = await applyLayout({ ...s.deps, trigger: 'manual', terminalCount: 1, getFirstTerminal: async () => null });
+  assert.equal(r.applied, false);
+  assert.match(r.notice, /Repo Layouts: Edit config/);
+});
+
+test('no config file: the worktree.created trigger stays silent (no notice)', async () => {
+  const s = setup(undefined);
+  assert.equal((await applyForWorktree(s.deps)).notice, undefined);
 });
 
 test('no matching project: does nothing', async () => {
@@ -74,4 +87,23 @@ test('applies the matched layout and logs ratio notes once', async () => {
 test('config validation errors propagate', async () => {
   const s = setup({ projects: { X: { directory: 'd' } } });
   await assert.rejects(applyForWorktree(s.deps), /directory/);
+});
+
+test('resolveActiveWorktree: null without context, terminal show with terminals, worktree list without', async () => {
+  assert.equal(await resolveActiveWorktree({ readContext: async () => null, orcaCli: async () => ({}) }), null);
+
+  const viaTerminal = await resolveActiveWorktree({
+    readContext: async () => ({ branch: 'b', displayName: 'd', terminals: [{ id: 't0' }, { id: 't1' }] }),
+    orcaCli: async (args) => {
+      assert.deepEqual(args, ['terminal', 'show', '--terminal', 't0']);
+      return { terminal: { worktreeId: 'w1', worktreePath: '/p' } };
+    },
+  });
+  assert.deepEqual(viaTerminal, { worktreeId: 'w1', worktreePath: '/p', terminals: [{ id: 't0' }, { id: 't1' }] });
+
+  const viaList = await resolveActiveWorktree({
+    readContext: async () => ({ branch: 'refs/heads/b', displayName: 'd', terminals: [] }),
+    orcaCli: async () => ({ worktrees: [{ id: 'w2', path: '/q', displayName: 'd', branch: 'b' }] }),
+  });
+  assert.deepEqual(viaList, { worktreeId: 'w2', worktreePath: '/q', terminals: [] });
 });

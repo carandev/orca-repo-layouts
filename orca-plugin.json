@@ -3,7 +3,7 @@
   "id": "repo-layouts",
   "publisher": "carandev",
   "name": "Repo Layouts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Applies a per-project terminal pane/tab layout to every new worktree (or on demand to an existing one), driven by a user config file.",
   "engines": {
     "orca": ">=1.4.0"
@@ -21,6 +21,21 @@
         "id": "apply-layout",
         "title": "Repo Layouts: Apply layout",
         "context": "worktree"
+      },
+      {
+        "id": "edit-config",
+        "title": "Repo Layouts: Edit config",
+        "context": "global"
+      },
+      {
+        "id": "install-shell",
+        "title": "Repo Layouts: Install shell integration",
+        "context": "global"
+      },
+      {
+        "id": "uninstall-shell",
+        "title": "Repo Layouts: Remove shell integration",
+        "context": "global"
       }
     ],
     "keybindings": [

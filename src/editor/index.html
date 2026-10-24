@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repo Layouts: config</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5b6573; --border: #d6dbe2;
+    --accent: #2f6fed; --accent-text: #ffffff; --danger: #c62828; --ok: #1b7f3b; --code-bg: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --panel: #1d2127; --text: #e6e9ee; --muted: #9aa5b3; --border: #343b45;
+      --accent: #5b8def; --accent-text: #0b1220; --danger: #ef7a7a; --ok: #5fcf85; --code-bg: #161a1f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0; }
+  p { margin: 4px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .path { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+  .banner { border: 1px solid var(--border); border-left-width: 4px; background: var(--panel); padding: 8px 12px; border-radius: 6px; margin: 12px 0; white-space: pre-wrap; word-break: break-word; }
+  .banner.error { border-left-color: var(--danger); }
+  .banner.ok { border-left-color: var(--ok); }
+  .banner.info { border-left-color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 12px 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .grow { flex: 1 1 160px; min-width: 0; }
+  label.field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); flex: 1 1 160px; min-width: 0; }
+  input[type=text], select { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+  input[type=text]:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.danger { color: var(--danger); }
+  .entry { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 8px; background: var(--bg); }
+  .entry-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .entry-head .idx { font-weight: 600; min-width: 1.5em; }
+  .entry-head select { width: auto; }
+  .entry-head .spacer { flex: 1; }
+  .fields { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--muted); }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow: auto; max-height: 320px; font: 12px/1.4 ui-monospace, Consolas, monospace; margin: 8px 0 0; }
+  .savebar { position: sticky; bottom: 0; background: var(--bg); padding: 8px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--border); margin-top: 12px; }
+  .check { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Repo Layouts: config</h1>
+  <p class="muted">Config file: <span class="path" id="cfgpath">loading...</span></p>
+  <div id="app"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var token = new URLSearchParams(location.search).get('token') || '';
+  var app = document.getElementById('app');
+  var uid = 0;
+  var state = null; // { autoApply, hadAutoApply, extra, projects: [{ key, layout: [entry] }] }
+  var notice = null; // { kind: 'error' | 'ok' | 'info', text }
+  var configPath = '';
+  var SKELETON = { projects: { '*': { layout: [{ label: 'claude' }] } } };
+  var HINT = 'When Orca starts an agent with the worktree, give entry 0 only a label: a command would be typed into the agent as a prompt.';
+
+  function h(tag, props) {
+    var el = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'class') el.className = props[k];
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), props[k]);
+      else if (k === 'disabled' || k === 'checked' || k === 'value') el[k] = props[k];
+      else el.setAttribute(k, props[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c == null || c === false) continue;
+      el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return el;
+  }
+
+  // ---- model <-> config ----
+  function newEntry(kind) {
+    return { id: ++uid, kind: kind, label: '', command: '', cwd: '', agent: '', split: 'right', from: null, url: '', ratio: undefined };
+  }
+  function entryFromConfig(e, i) {
+    var m = newEntry('terminal');
+    if (e === null || typeof e !== 'object' || Array.isArray(e)) return m;
+    if (e.browser !== undefined && i > 0) {
+      m.kind = 'browser';
+      m.url = typeof e.browser === 'string' ? e.browser : '';
+      return m;
+    }
+    m.label = typeof e.label === 'string' ? e.label : '';
+    m.command = typeof e.command === 'string' ? e.command : '';
+    m.cwd = typeof e.cwd === 'string' ? e.cwd : '';
+    if (i === 0) {
+      m.agent = typeof e.agent === 'string' ? e.agent : '';
+    } else if (e.split !== undefined) {
+      m.kind = 'split';
+      m.split = e.split === 'down' ? 'down' : 'right';
+      if (e.ratio !== undefined) m.ratio = e.ratio;
+    } else {
+      m.kind = 'tab';
+    }
+    return m;
+  }
+  function fromConfig(data) {
+    var extra = {};
+    Object.keys(data).forEach(function (k) {
+      if (k !== 'projects' && k !== 'autoApplyOnShellStart') extra[k] = data[k];
+    });
+    var projects = [];
+    var src = data.projects && typeof data.projects === 'object' && !Array.isArray(data.projects) ? data.projects : {};
+    Object.keys(src).forEach(function (key) {
+      var p = src[key] || {};
+      var layout = Array.isArray(p.layout) ? p.layout.map(entryFromConfig) : [];
+      // Resolve explicit "from" indices to entry references so reordering keeps them meaningful.
+      if (Array.isArray(p.layout)) {
+        p.layout.forEach(function (e, i) {
+          if (i > 0 && e && e.split !== undefined && Number.isInteger(e.from) && e.from >= 0 && e.from < i) {
+            layout[i].from = layout[e.from].id;
+          }
+        });
+      }
+      projects.push({ key: key, layout: layout });
+    });
+    return {
+      autoApply: data.autoApplyOnShellStart === true,
+      hadAutoApply: data.autoApplyOnShellStart !== undefined,
+      extra: extra,
+      projects: projects
+    };
+  }
+  function trimmed(s) { return typeof s === 'string' ? s.trim() : ''; }
+  function effectiveFrom(layout, i) {
+    var e = layout[i];
+    if (e.from !== null) {
+      for (var j = 0; j < i; j++) if (layout[j].id === e.from && layout[j].kind !== 'browser') return j;
+    }
+    for (var k = i - 1; k >= 0; k--) if (layout[k].kind !== 'browser') return k;
+    return 0;
+  }
+  function entryToConfig(layout, i) {
+    var e = layout[i];
+    var out = {};
+    if (i === 0) {
+      if (trimmed(e.label)) out.label = e.label;
+      if (trimmed(e.command)) out.command = e.command;
+      if (trimmed(e.cwd)) out.cwd = e.cwd;
+      if (trimmed(e.agent)) out.agent = e.agent;
+      return out;
+    }
+    if (e.kind === 'browser') return { browser: trimmed(e.url) ? e.url : true };
+    if (e.kind === 'split') {
+      out.split = e.split;
+      var from = effectiveFrom(layout, i);
+      if (from !== i - 1) out.from = from;
+      if (e.ratio !== undefined) out.ratio = e.ratio;
+    } else if (trimmed(e.label)) {
+      out.label = e.label;
+    }
+    if (trimmed(e.command)) out.command = e.command;
+    if (trimmed(e.cwd)) out.cwd = e.cwd;
+    return out;
+  }
+  function toConfig() {
+    var out = {};
+    Object.keys(state.extra).forEach(function (k) { out[k] = state.extra[k]; });
+    if (state.autoApply || state.hadAutoApply) out.autoApplyOnShellStart = state.autoApply;
+    out.projects = {};
+    state.projects.forEach(function (p) {
+      out.projects[p.key] = { layout: p.layout.map(function (_, i) { return entryToConfig(p.layout, i); }) };
+    });
+    return out;
+  }
+  function coerceFirst(p) {
+    if (p.layout.length > 0) p.layout[0].kind = 'terminal';
+  }
+  function problems() {
+    var list = [];
+    var seen = {};
+    state.projects.forEach(function (p) {
+      if (!p.key.trim()) list.push('A project has an empty name.');
+      if (seen[p.key]) list.push('Duplicate project name: ' + p.key);
+      seen[p.key] = true;
+    });
+    return list;
+  }
+
+  // ---- rendering ----
+  function banner(kind, text) { return h('div', { class: 'banner ' + kind, role: kind === 'error' ? 'alert' : 'status' }, text); }
+
+  function textField(labelText, value, onInput, placeholder) {
+    var input = h('input', { type: 'text', value: value, placeholder: placeholder || '', spellcheck: 'false' });
+    input.addEventListener('input', function () { onInput(input.value); refreshPreview(); });
+    return h('label', { class: 'field' }, labelText, input);
+  }
+
+  function renderEntry(p, i) {
+    var e = p.layout[i];
+    var kindSel = h('select', { 'aria-label': 'Entry kind', disabled: i === 0 });
+    (i === 0 ? [['terminal', 'first terminal']] : [['tab', 'tab'], ['split', 'split'], ['browser', 'browser']]).forEach(function (o) {
+      var opt = h('option', { value: o[0] }, o[1]);
+      if (o[0] === e.kind) opt.selected = true;
+      kindSel.appendChild(opt);
+    });
+    kindSel.addEventListener('change', function () { e.kind = kindSel.value; render(); });
+
+    var head = h('div', { class: 'entry-head' },
+      h('span', { class: 'idx' }, '#' + i), kindSel, h('span', { class: 'spacer' }),
+      h('button', { type: 'button', title: 'Move up', disabled: i === 0, onclick: function () { move(p, i, -1); } }, 'Up'),
+      h('button', { type: 'button', title: 'Move down', disabled: i === p.layout.length - 1, onclick: function () { move(p, i, 1); } }, 'Down'),
+      h('button', { type: 'button', class: 'danger', onclick: function () { remove(p, i); } }, 'Remove'));
+
+    var fields = h('div', { class: 'fields' });
+    if (e.kind === 'browser') {
+      fields.appendChild(textField('URL (empty for a blank tab; http or https)', e.url, function (v) { e.url = v; }, 'https://...'));
+    } else {
+      if (e.kind === 'split') {
+        var dir = h('select', { 'aria-label': 'Split direction' });
+        [['right', 'split right'], ['down', 'split down']].forEach(function (o) {
+          var opt = h('option', { value: o[0] }, o[1]);
+          if (o[0] === e.split) opt.selected = true;
+          dir.appendChild(opt);
+        });
+        dir.addEventListener('change', function () { e.split = dir.value; refreshPreview(); });
+        var from = h('select', { 'aria-label': 'Split from' });
+        var eff = effectiveFrom(p.layout, i);
+        for (var j = 0; j < i; j++) {
+          if (p.layout[j].kind === 'browser') continue;
+          var opt = h('option', { value: String(p.layout[j].id) }, '#' + j + (p.layout[j].label ? ' ' + p.layout[j].label : ''));
+          if (j === eff) opt.selected = true;
+          from.appendChild(opt);
+        }
+        from.addEventListener('change', function () { e.from = Number(from.value); refreshPreview(); });
+        fields.appendChild(h('label', { class: 'field' }, 'Direction', dir));
+        fields.appendChild(h('label', { class: 'field' }, 'Split from', from));
+      } else {
+        fields.appendChild(textField('Label (tab title)', e.label, function (v) { e.label = v; }));
+        if (i === 0) fields.appendChild(textField('Agent (e.g. claude; manual apply only)', e.agent, function (v) { e.agent = v; }));
+      }
+      fields.appendChild(textField('Command', e.command, function (v) { e.command = v; }));
+      fields.appendChild(textField('Working directory (relative to the worktree)', e.cwd, function (v) { e.cwd = v; }));
+    }
+    return h('div', { class: 'entry' }, head, fields, i === 0 ? h('p', { class: 'muted' }, HINT) : null);
+  }
+
+  function renderProject(p, pi) {
+    var name = h('input', { type: 'text', value: p.key, 'aria-label': 'Project name', spellcheck: 'false' });
+    name.addEventListener('input', function () { p.key = name.value; refreshPreview(); });
+    var card = h('div', { class: 'card' },
+      h('div', { class: 'row' },
+        h('div', { class: 'grow' }, name),
+        p.layout.length === 0 ? h('span', { class: 'badge' }, 'opted out') : null,
+        h('button', { type: 'button', class: 'danger', onclick: function () { state.projects.splice(pi, 1); render(); } }, 'Delete project')),
+      h('p', { class: 'muted' }, 'Folder name, absolute path, or * for the default. An empty layout opts the project out.'));
+    p.layout.forEach(function (_, i) { card.appendChild(renderEntry(p, i)); });
+    card.appendChild(h('div', { class: 'row', style: 'margin-top:8px' },
+      h('button', { type: 'button', onclick: function () { addEntry(p); } }, p.layout.length === 0 ? 'Add first terminal' : 'Add entry')));
+    return card;
+  }
+
+  var previewEl = null;
+  var saveBtn = null;
+  var problemsEl = null;
+  function refreshPreview() {
+    if (!state) return;
+    if (previewEl) previewEl.textContent = JSON.stringify(toConfig(), null, 2);
+    var list = problems();
+    if (saveBtn) saveBtn.disabled = list.length > 0;
+    if (problemsEl) problemsEl.textContent = list.join(' ');
+  }
+
+  function render() {
+    app.textContent = '';
+    document.getElementById('cfgpath').textContent = configPath;
+    if (notice) app.appendChild(banner(notice.kind, notice.text));
+    if (!state) return;
+    var auto = h('input', { type: 'checkbox', checked: state.autoApply });
+    auto.addEventListener('change', function () { state.autoApply = auto.checked; refreshPreview(); });
+    app.appendChild(h('div', { class: 'card' },
+      h('label', { class: 'check' }, auto, h('span', null, 'Apply layouts automatically when a terminal starts (autoApplyOnShellStart)')),
+      h('p', { class: 'muted' }, 'Needs the shell integration (command palette: Repo Layouts: Install shell integration).')));
+    app.appendChild(h('h2', null, 'Projects'));
+    state.projects.forEach(function (p, pi) { app.appendChild(renderProject(p, pi)); });
+    app.appendChild(h('div', { class: 'row' },
+      h('button', { type: 'button', onclick: function () { addProject(); } }, 'Add project')));
+    app.appendChild(h('h2', { style: 'margin-top:16px' }, 'Preview (what will be saved)'));
+    previewEl = h('pre', { 'aria-label': 'JSON preview' });
+    app.appendChild(previewEl);
+    problemsEl = h('span', { class: 'muted', role: 'status' });
+    saveBtn = h('button', { type: 'button', class: 'primary', onclick: save }, 'Save');
+    app.appendChild(h('div', { class: 'savebar' }, saveBtn, problemsEl));
+    refreshPreview();
+  }
+
+  // ---- mutations ----
+  function move(p, i, d) {
+    var j = i + d;
+    if (j < 0 || j >= p.layout.length) return;
+    var t = p.layout[i]; p.layout[i] = p.layout[j]; p.layout[j] = t;
+    coerceFirst(p);
+    render();
+  }
+  function remove(p, i) { p.layout.splice(i, 1); coerceFirst(p); render(); }
+  function addEntry(p) {
+    p.layout.push(newEntry(p.layout.length === 0 ? 'terminal' : 'tab'));
+    render();
+  }
+  function addProject() {
+    var key = 'new-project';
+    var n = 1;
+    while (state.projects.some(function (p) { return p.key === key; })) key = 'new-project-' + (++n);
+    state.projects.push({ key: key, layout: [newEntry('terminal')] });
+    render();
+  }
+
+  // ---- server ----
+  function api(method, body) {
+    var opts = { method: method, headers: { 'X-Token': token } };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch('/api/config', opts).then(function (r) {
+      return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; }).then(function (j) {
+        return { status: r.status, body: j };
+      });
+    });
+  }
+  function save() {
+    saveBtn.disabled = true;
+    api('POST', toConfig()).then(function (r) {
+      if (r.body.ok) notice = { kind: 'ok', text: 'Saved to ' + configPath };
+      else notice = { kind: 'error', text: 'Not saved: ' + (r.body.error || 'HTTP ' + r.status) };
+      render();
+      window.scrollTo(0, 0);
+    }, function (e) {
+      notice = { kind: 'error', text: 'Not saved: ' + e.message + ' (the editor may have timed out; run Repo Layouts: Edit config again)' };
+      render();
+    });
+  }
+  function startFromSkeleton() {
+    state = fromConfig(SKELETON);
+    notice = { kind: 'info', text: 'Starting from a skeleton. Nothing is written until you press Save.' };
+    render();
+  }
+  function load() {
+    api('GET').then(function (r) {
+      var j = r.body;
+      if (r.status !== 200) {
+        notice = { kind: 'error', text: 'Could not load the config: ' + (j.error || 'HTTP ' + r.status) };
+        return render();
+      }
+      configPath = j.path;
+      if (!j.exists) {
+        state = fromConfig(SKELETON);
+        notice = { kind: 'info', text: 'No config file yet. Starting from a skeleton; it is created when you press Save.' };
+      } else if (j.data === null) {
+        state = null;
+        notice = { kind: 'error', text: 'The existing file is not valid JSON, so it cannot be edited here:\n' + j.error + '\nIt is not overwritten unless you start from the skeleton and press Save.' };
+        render();
+        app.appendChild(h('button', { type: 'button', onclick: startFromSkeleton }, 'Start from skeleton'));
+        return;
+      } else {
+        state = fromConfig(j.data);
+        notice = j.error ? { kind: 'error', text: 'The existing file has a problem (fix it below, then Save):\n' + j.error } : null;
+      }
+      render();
+    }, function (e) {
+      notice = { kind: 'error', text: 'Could not reach the editor server: ' + e.message };
+      render();
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

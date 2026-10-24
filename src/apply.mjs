@@ -30,8 +30,9 @@ export async function applyLayout({
 }) {
   const config = await loadConfig({ configFile, fs });
   if (!config) {
-    log(`no config at ${configFile}; nothing to do`);
-    return { applied: false };
+    const notice = `No config at ${configFile}: run "Repo Layouts: Edit config" to create one`;
+    log(notice);
+    return trigger === 'manual' ? { applied: false, notice } : { applied: false };
   }
   const root = repoRoot ?? (await resolveMainRepoRoot({ startDirs: [worktreePath], git })).repoRoot;
   const match = matchProject(config.projects, root, pathApi);
@@ -75,13 +76,12 @@ export function applyForWorktree({ waitForFirstTerminal, ...rest }) {
 const stripRef = (branch) => (typeof branch === 'string' ? branch.replace(/^refs\/heads\//, '') : '');
 
 /**
- * Apply layout command resolver: finds the active worktree via `readContext()`
- * (null | { branch, displayName, terminals: [{ id }] }), then applies in manual mode.
+ * Finds the active worktree via `readContext()` (null | { branch, displayName, terminals: [{ id }] }).
+ * Returns { worktreeId, worktreePath, terminals } or null when no worktree is focused; throws when it cannot be resolved.
  */
-export async function applyForActiveWorktree({ readContext, ...rest }) {
-  const { orcaCli } = rest;
+export async function resolveActiveWorktree({ readContext, orcaCli }) {
   const context = await readContext();
-  if (!context) return { applied: false, notice: 'No active worktree' };
+  if (!context) return null;
   const terminals = context.terminals ?? [];
   let worktreeId;
   let worktreePath;
@@ -102,6 +102,14 @@ export async function applyForActiveWorktree({ readContext, ...rest }) {
     worktreePath = matches[0].path;
   }
   if (!worktreeId || !worktreePath) throw new Error('Could not resolve the active worktree id and path');
+  return { worktreeId, worktreePath, terminals };
+}
+
+/** Apply layout command resolver: resolves the active worktree, then applies in manual mode. */
+export async function applyForActiveWorktree({ readContext, ...rest }) {
+  const active = await resolveActiveWorktree({ readContext, orcaCli: rest.orcaCli });
+  if (!active) return { applied: false, notice: 'No active worktree' };
+  const { worktreeId, worktreePath, terminals } = active;
   return applyLayout({
     ...rest,
     trigger: 'manual',

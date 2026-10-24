@@ -180,13 +180,18 @@ export async function loadConfig({ configFile, fs }) {
   } catch (e) {
     throw new Error(`Invalid JSON in ${configFile}: ${e.message}`);
   }
-  if (!isObject(data)) throw new Error(`${configFile} must contain a JSON object`);
+  return validateConfig(data, configFile);
+}
+
+/** Validates an already-parsed config object; `file` only names the source in error messages. */
+export function validateConfig(data, file) {
+  if (!isObject(data)) throw new Error(`${file} must contain a JSON object`);
   if (data.autoApplyOnShellStart !== undefined && typeof data.autoApplyOnShellStart !== 'boolean') {
-    throw new Error(`"autoApplyOnShellStart" in ${configFile} must be a boolean`);
+    throw new Error(`"autoApplyOnShellStart" in ${file} must be a boolean`);
   }
   return {
-    projects: readProjects(data, configFile),
+    projects: readProjects(data, file),
     autoApplyOnShellStart: data.autoApplyOnShellStart === true,
-    source: configFile,
+    source: file,
   };
 }

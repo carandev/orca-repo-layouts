@@ -52,3 +52,9 @@ export function removeBlock(text) {
   const found = findBlock(text);
   return found ? text.slice(0, found.start) + text.slice(found.end) : text;
 }
+
+/** The existing block text (delimiters included), or null. */
+export function getBlock(text) {
+  const found = text == null ? null : findBlock(text);
+  return found ? text.slice(found.start, found.end) : null;
+}

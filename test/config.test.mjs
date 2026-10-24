@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { configFilePath, loadConfig, matchProject } from '../src/config.mjs';
+import { configFilePath, loadConfig, matchProject, validateConfig } from '../src/config.mjs';
 
 const FILE = '/cfg/config.json';
 const fsOf = (files) => ({ readFile: async (p) => (p in files ? files[p] : null) });
@@ -139,4 +139,14 @@ test('autoApplyOnShellStart: optional boolean, default false', async () => {
   assert.equal((await load({ autoApplyOnShellStart: true })).autoApplyOnShellStart, true);
   assert.equal((await load({ autoApplyOnShellStart: false })).autoApplyOnShellStart, false);
   await assert.rejects(load({ autoApplyOnShellStart: 'yes' }), /autoApplyOnShellStart.*boolean/);
+});
+
+test('validateConfig validates a parsed object with the same messages as loadConfig', () => {
+  const ok = validateConfig({ autoApplyOnShellStart: true, projects: { X: { layout: [{ label: 'a' }] } } }, FILE);
+  assert.equal(ok.autoApplyOnShellStart, true);
+  assert.equal(ok.source, FILE);
+  assert.deepEqual(ok.projects.X.layout, [{ label: 'a' }]);
+  assert.throws(() => validateConfig([], FILE), /must contain a JSON object/);
+  assert.throws(() => validateConfig({ autoApplyOnShellStart: 1 }, FILE), /autoApplyOnShellStart/);
+  assert.throws(() => validateConfig({ projects: { X: { directory: 'd' } } }, FILE), /directory.*not supported/);
 });
