@@ -5,7 +5,7 @@ Orca plugin that opens your terminal tabs and splits automatically in every new 
 ## Install
 
 1. Orca: **Settings -> Plugins -> Install plugin -> Git URL**.
-2. Paste `https://github.com/carandev/orca-repo-layouts.git#v0.4.0` and accept the permissions.
+2. Paste `https://github.com/carandev/orca-repo-layouts.git#v0.4.1` and accept the permissions.
 
 Requires Orca >= 1.4.0. To update, install again with the newer tag.
 

@@ -41,6 +41,40 @@ test('resolveOrcaCli on Linux prefers the ~/.local/bin/orca-ide symlink', () => 
   assert.deepEqual(env, { HOME: '/home/me', PATH: '/usr/bin' });
 });
 
+test('resolveOrcaCli on Linux uses the Orca CLI shim when the symlink is missing', () => {
+  const shim = '/home/me/.config/orca/linux-orca-cli-shim/orca';
+  const { bin } = resolveOrcaCli({
+    env: { HOME: '/home/me' },
+    platform: 'linux',
+    pathApi: path.posix,
+    exists: (p) => p === shim || p === '/usr/lib/orca-ide/bin/orca-ide',
+  });
+  assert.equal(bin, shim);
+});
+
+test('resolveOrcaCli on Linux finds the shim under XDG_CONFIG_HOME', () => {
+  const shim = '/xdg/orca/linux-orca-cli-shim/orca';
+  const { bin } = resolveOrcaCli({
+    env: { HOME: '/home/me', XDG_CONFIG_HOME: '/xdg' },
+    platform: 'linux',
+    pathApi: path.posix,
+    exists: (p) => p === shim,
+  });
+  assert.equal(bin, shim);
+});
+
+// /usr/bin/orca-ide of the AUR package launches Electron and appends --ozone-platform, which the CLI rejects.
+test('resolveOrcaCli on Linux uses the packaged CLI before orca-ide on PATH', () => {
+  const packaged = '/usr/lib/orca-ide/bin/orca-ide';
+  const { bin } = resolveOrcaCli({
+    env: { HOME: '/home/me' },
+    platform: 'linux',
+    pathApi: path.posix,
+    exists: (p) => p === packaged,
+  });
+  assert.equal(bin, packaged);
+});
+
 test('resolveOrcaCli on Linux falls back to orca-ide on PATH, never bare orca', () => {
   const { bin } = resolveOrcaCli({ env: { HOME: '/home/me' }, platform: 'linux', pathApi: path.posix, exists: none });
   assert.equal(bin, 'orca-ide');

@@ -23,8 +23,16 @@ export function resolveOrcaCli({
   if (platform === 'linux') {
     // Bare `orca` is the GNOME screen reader on Linux; Orca's CLI is `orca-ide`,
     // symlinked into ~/.local/bin, which a desktop-launched app may lack on PATH.
-    const link = pathApi.join(home, '.local', 'bin', 'orca-ide')
-    return { bin: exists(link) ? link : 'orca-ide', env: { ...env } }
+    // Without that symlink, `orca-ide` on PATH can be a packaged Electron launcher
+    // that appends --ozone-platform (rejected by the CLI), so Orca's own shim and
+    // the packaged CLI are tried before it.
+    const configHome = env.XDG_CONFIG_HOME ?? pathApi.join(home, '.config')
+    const candidates = [
+      pathApi.join(home, '.local', 'bin', 'orca-ide'),
+      pathApi.join(configHome, 'orca', 'linux-orca-cli-shim', 'orca'),
+      '/usr/lib/orca-ide/bin/orca-ide'
+    ]
+    return { bin: candidates.find((p) => exists(p)) ?? 'orca-ide', env: { ...env } }
   }
   return { bin: 'orca', env: { ...env } }
 }

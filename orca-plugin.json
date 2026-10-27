@@ -3,7 +3,7 @@
   "id": "repo-layouts",
   "publisher": "carandev",
   "name": "Repo Layouts",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Applies a per-project terminal pane/tab layout to every new worktree (or on demand to an existing one), driven by a user config file.",
   "engines": {
     "orca": ">=1.4.0"
