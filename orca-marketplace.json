@@ -7,7 +7,7 @@
       "source": {
         "kind": "git",
         "url": "https://github.com/carandev/orca-repo-layouts.git",
-        "ref": "v0.4.0"
+        "ref": "v0.4.1"
       },
       "description": "Applies a per-project terminal pane/tab layout to every new worktree, with a built-in config editor.",
       "categories": [

@@ -78,7 +78,7 @@ node bin/install-shell.mjs --uninstall     # remove the block
 
 ## Orca CLI
 
-The plugin drives the Orca CLI: `orca.exe` from the Orca install on Windows; `~/.local/bin/orca-ide` on Linux (install the CLI from Orca), falling back to `orca-ide` on `PATH`; `orca` on `PATH` on macOS.
+The plugin drives the Orca CLI: `orca.exe` from the Orca install on Windows; `~/.local/bin/orca-ide` on Linux (install the CLI from Orca), then Orca's shim `~/.config/orca/linux-orca-cli-shim/orca` (honoring `XDG_CONFIG_HOME`), then the packaged `/usr/lib/orca-ide/bin/orca-ide`, falling back to `orca-ide` on `PATH`; `orca` on `PATH` on macOS.
 
 ## Development
 
