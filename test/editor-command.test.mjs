@@ -5,7 +5,7 @@ import { browserCommand } from '../src/open-url.mjs';
 
 const URL_ = 'http://127.0.0.1:5555/?token=t';
 
-function setup({ context = { branch: 'b', displayName: 'wt', terminals: [{ id: 't0' }] }, cliFails = false, openFails = false } = {}) {
+function setup({ context = { branch: 'b', displayName: 'wt', terminals: [{ id: 't0' }] }, cliFails = false, switchFails = false, openFails = false } = {}) {
   const calls = [];
   const opened = [];
   const notes = [];
@@ -22,6 +22,8 @@ function setup({ context = { branch: 'b', displayName: 'wt', terminals: [{ id: '
         calls.push(args);
         if (cliFails) throw new Error('cli down');
         if (args[0] === 'terminal') return { terminal: { worktreeId: 'r::/w/wt', worktreePath: '/w/wt' } };
+        if (args[1] === 'create') return { browserPageId: 'p1' };
+        if (args[1] === 'switch' && switchFails) throw new Error('switch down');
         return {};
       },
       openExternal: async (url) => {
@@ -38,9 +40,25 @@ test('opens the editor in an Orca browser tab of the active worktree and notifie
   const s = setup();
   const r = await openConfigEditor(s.deps);
   assert.equal(r.opened, 'orca');
-  assert.deepEqual(s.calls.at(-1), ['tab', 'create', '--worktree', 'id:r::/w/wt', '--url', URL_]);
+  assert.deepEqual(s.calls.at(-2), ['tab', 'create', '--worktree', 'id:r::/w/wt', '--url', URL_]);
   assert.equal(s.opened.length, 0);
   assert.equal(s.notes.length, 1);
+  assert.ok(s.notes[0][1].includes(URL_));
+});
+
+// Orca creates the tab in the background, so without a switch the user keeps seeing the terminal.
+test('brings the new editor tab to the front', async () => {
+  const s = setup();
+  await openConfigEditor(s.deps);
+  assert.deepEqual(s.calls.at(-1), ['tab', 'switch', '--page', 'p1', '--worktree', 'id:r::/w/wt', '--focus']);
+});
+
+test('keeps the Orca tab and skips the OS browser when focusing it fails', async () => {
+  const s = setup({ switchFails: true });
+  const r = await openConfigEditor(s.deps);
+  assert.equal(r.opened, 'orca');
+  assert.equal(s.opened.length, 0);
+  assert.match(s.logs.join('\n'), /switch down/);
   assert.ok(s.notes[0][1].includes(URL_));
 });
 
