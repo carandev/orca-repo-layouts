@@ -43,7 +43,7 @@ Top-level `"autoApplyOnShellStart": true` (optional, default `false`) enables th
 
 ## Config editor
 
-- Runs inside the plugin and opens in an Orca browser tab of the active worktree (falls back to your default browser; the URL is also shown in a notification).
+- Runs inside the plugin and opens in an Orca browser tab of the active worktree, brought to the front (falls back to your default browser; the URL is also shown in a notification).
 - Localhost only: `127.0.0.1`, random port, random per-run token in the URL; other `Host` or cross-origin `Origin` requests are rejected.
 - Validates with the same rules as the plugin; writes atomically and only on Save. `ratio` is kept when already present.
 - Stops after 15 minutes without requests; run the command again for a new URL.
